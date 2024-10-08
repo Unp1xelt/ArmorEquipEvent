@@ -16,7 +16,7 @@ The events handle when a player
         <li>Hotswap with hotbar(1-9) or with second hand(F)</li>
         <li>Dragged item</li>
     </ul>
-    <li>Equip item through hotbar right-click</li>
+    <li>Equip/Swap item through hotbar right-click</li>
     <li>Equip item by Dispenser</li>
     <li>Unequip when Player dies</li>
     <li>Unequip when armor item breaks</li>
