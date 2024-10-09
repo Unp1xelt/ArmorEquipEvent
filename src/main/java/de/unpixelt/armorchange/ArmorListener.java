@@ -1,6 +1,8 @@
 package de.unpixelt.armorchange;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -8,16 +10,30 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockDispenseArmorEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.inventory.*;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemBreakEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import static de.unpixelt.armorchange.ArmorEvent.ArmorAction;
+import de.unpixelt.armorchange.ArmorEvent.ArmorAction;
 
 class ArmorListener implements Listener {
+    private static final boolean CAN_SWAP;
+    static {
+        final String[] versionArray = Bukkit.getVersion().split(".");
+        final Integer major = Integer.valueOf(versionArray[0]);
+        final Integer minor = Integer.valueOf(versionArray[1]);
+        final Integer patch = Integer.valueOf(versionArray[2]);
+        CAN_SWAP = major > 1
+                || (major == 1 && minor > 19)
+                || (major == 1 && minor == 19 && patch >= 4);
+    }
 
     private ArmorEquipEvent callEquip(Player entity, ItemStack item, EquipmentSlot slot, ArmorAction action) {
         ArmorEquipEvent event = new ArmorEquipEvent(entity, item, slot, action);
@@ -37,20 +53,24 @@ class ArmorListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     private void onInventoryDrag(InventoryDragEvent e) {
-        if (isNotPlayerInventory(e.getInventory())) return;
+        if (isNotPlayerInventory(e.getInventory()))
+            return;
 
         final EquipmentSlot equipmentSlot = e.getOldCursor().getType().getEquipmentSlot();
         // Check if dragged item is not armor.
-        if (equipmentSlot.ordinal() < 2) return;
+        if (equipmentSlot.ordinal() < 2)
+            return;
 
         for (int rawSlot : e.getRawSlots()) {
             // Check if dragged item is in correct armor slot.
             // RawArmorSlot (Head: 5, Chest: 6, Leggings: 7, Feet: 8)
             // EquipmentOrdinal (Head: 5, Chest: 4, Leggings: 3, Feet: 2)
             if (rawSlot - 10 + equipmentSlot.ordinal() == 0) {
-                // We use 'getView()' instead of 'getInventory()' because it's returning the inventory before the drag.
+                // We use 'getView()' instead of 'getInventory()' because it's returning the
+                // inventory before the drag.
                 if (e.getView().getItem(rawSlot).getType().isAir()) {
-                    callEquip((Player)e.getWhoClicked(), e.getOldCursor(), equipmentSlot, ArmorAction.DRAG).updateCancellable(e);
+                    callEquip((Player) e.getWhoClicked(), e.getOldCursor(), equipmentSlot, ArmorAction.DRAG)
+                            .updateCancellable(e);
                     break;
                 }
             }
@@ -59,17 +79,20 @@ class ArmorListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     private void onInventoryClick(InventoryClickEvent e) {
-        if (e.getClickedInventory() == null || isNotPlayerInventory(e.getInventory())) return;
+        if (e.getClickedInventory() == null || isNotPlayerInventory(e.getInventory()))
+            return;
 
         final ItemStack clicked = e.getCurrentItem();
         final ItemStack holding = e.getCursor();
-        if (clicked == null || holding == null) return;
+        if (clicked == null || holding == null)
+            return;
 
         final EquipmentSlot clickedEquipment = clicked.getType().getEquipmentSlot();
         final EquipmentSlot holdingEquipment = holding.getType().getEquipmentSlot();
         final Player p = (Player) e.getWhoClicked();
 
-        // Collect to cursor begins to collect from 0 rawSlot. So we first check the player's crafting grid and then
+        // Collect to cursor begins to collect from 0 rawSlot. So we first check the
+        // player's crafting grid and then
         // the armor slots if they have an item to collect.
         // See: https://wiki.vg/Inventory#Player_Inventory
         if (e.getAction() == InventoryAction.COLLECT_TO_CURSOR || e.getAction() == InventoryAction.NOTHING) {
@@ -83,21 +106,23 @@ class ArmorListener implements Listener {
                 }
             }
 
-            if (collectedAmount >= holding.getMaxStackSize()) return;
+            if (collectedAmount >= holding.getMaxStackSize())
+                return;
 
             // Check armor contents from head to feet.
             final ItemStack[] armor = p.getInventory().getArmorContents();
             for (int i = armor.length - 1; i >= 0; i--) {
                 if (holding.isSimilar(armor[i])) {
-                    if (collectedAmount + armor[i].getAmount() > holding.getMaxStackSize()) return;
+                    if (collectedAmount + armor[i].getAmount() > holding.getMaxStackSize())
+                        return;
 
-                    ArmorEvent armorEvent = callUnequip(p, armor[i].clone(), EquipmentSlot.values()[i + 2], ArmorAction.DOUBLE_CLICK);
+                    ArmorEvent armorEvent = callUnequip(p, armor[i].clone(), EquipmentSlot.values()[i + 2],
+                            ArmorAction.DOUBLE_CLICK);
                     // Only cancel the armor to collect.
                     if (armorEvent.isCancelled()) {
                         holding.setAmount(holding.getAmount() - armorEvent.getItem().getAmount());
                         Bukkit.getScheduler().runTask(ArmorPlugin.getPlugin(), () -> {
                             p.getInventory().setItem(armorEvent.getArmorSlot(), armorEvent.getItem());
-                            p.updateInventory();
                         });
                     } else {
                         collectedAmount += armor[i].getAmount();
@@ -110,17 +135,17 @@ class ArmorListener implements Listener {
         if (e.getSlotType() == InventoryType.SlotType.CONTAINER || e.getSlotType() == InventoryType.SlotType.QUICKBAR) {
             // Shift click equip from player's inventory.
             if (e.isShiftClick()) {
-                if (clickedEquipment.ordinal() < 2) return;
-
+                if (clickedEquipment.ordinal() < 2)
+                    return;
+                final ItemStack equipedItem = p.getInventory().getItem(clickedEquipment);
                 // If armor equipment slot is empty, then we can equip the clicked item.
-                if (p.getInventory().getItem(clickedEquipment) == null) {
+                if (equipedItem == null || equipedItem.getType() == Material.AIR) {
                     ArmorEvent armorEvent = callEquip(p, clicked, clickedEquipment, ArmorAction.SHIFT_CLICK);
                     // Move clicked item to other inventory when cancelled.
                     if (armorEvent.isCancelled()) {
                         p.getInventory().setItem(armorEvent.getArmorSlot(), armorEvent.getItem());
                         Bukkit.getScheduler().runTask(ArmorPlugin.getPlugin(), () -> {
                             p.getInventory().setItem(armorEvent.getArmorSlot(), null);
-                            p.updateInventory();
                         });
                     }
                 }
@@ -139,14 +164,19 @@ class ArmorListener implements Listener {
                     // If not and max stack size is 1 the item can't be stacked,
                     // so it also can not be unequipped.
                     // This will happen most of the time because armor is usually equipped.
-                    if (clicked.getMaxStackSize() == 1) return;
+                    if (clicked.getMaxStackSize() == 1)
+                        return;
 
-                    // But if we have a skeleton head for example or any other item or block which has a higher max
-                    // stack size, we have to check if the player's inventory contains a similar item.
+                    // But if we have a skeleton head for example or any other item or block which
+                    // has a higher max
+                    // stack size, we have to check if the player's inventory contains a similar
+                    // item.
                     for (ItemStack item : p.getInventory().getStorageContents()) {
-                        if (!clicked.isSimilar(item)) continue;
+                        if (!clicked.isSimilar(item))
+                            continue;
 
-                        // And if the amount of the equipped (clicked) plus the amount of the item in the inventory
+                        // And if the amount of the equipped (clicked) plus the amount of the item in
+                        // the inventory
                         // is not above the max stack size we can FULLY unequipped it.
                         if (clicked.getAmount() + item.getAmount() <= clicked.getMaxStackSize()) {
                             callUnequip(p, clicked, armorSlot, ArmorAction.SHIFT_CLICK).updateCancellable(e);
@@ -158,10 +188,14 @@ class ArmorListener implements Listener {
 
                 if (!clicked.getType().isAir()) {
                     if (clicked.getAmount() > 1) {
-                        // Check if the item is halved. In Creative 'holding' (e.getCursor()) has the result of the
+                        // Check if the item is halved. In Creative 'holding' (e.getCursor()) has the
+                        // result of the
                         // event, so we use it to check.
-                        if (e.getClick() == ClickType.CREATIVE && (holding.getAmount() > 1 || (clicked.getAmount() == 2 && holding.isSimilar(clicked)))) return;
-                        else if (holding.getType().isAir() && e.isRightClick()) return;
+                        if (e.getClick() == ClickType.CREATIVE && (holding.getAmount() > 1
+                                || (clicked.getAmount() == 2 && holding.isSimilar(clicked))))
+                            return;
+                        else if (holding.getType().isAir() && e.isRightClick())
+                            return;
                     }
                     callUnequip(p, clicked, armorSlot, ArmorAction.CLICK).updateCancellable(e);
                 }
@@ -181,10 +215,8 @@ class ArmorListener implements Listener {
                 if (!clicked.getType().isAir()) {
                     callUnequip(p, clicked, armorSlot, ArmorAction.HOTBAR_SWAP).updateCancellable(e);
                 }
-                if (item != null) {
-                    if (item.getType().getEquipmentSlot() == armorSlot) {
-                        callEquip(p, item, armorSlot, ArmorAction.HOTBAR_SWAP).updateCancellable(e);
-                    }
+                if (item != null && item.getType().getEquipmentSlot() == armorSlot) {
+                    callEquip(p, item, armorSlot, ArmorAction.HOTBAR_SWAP).updateCancellable(e);
                 }
             } else if (holding.getType().isAir()) {
                 if (e.getClick() == ClickType.DROP) {
@@ -200,52 +232,65 @@ class ArmorListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     private void onPlayerInteract(PlayerInteractEvent e) {
-        if (e.getAction() == Action.PHYSICAL || e.getAction() == Action.LEFT_CLICK_AIR || e.getAction() == Action.LEFT_CLICK_BLOCK) return;
-        if (!e.hasItem()) return;
+        if (e.getAction() == Action.PHYSICAL || e.getAction() == Action.LEFT_CLICK_AIR
+                || e.getAction() == Action.LEFT_CLICK_BLOCK)
+            return;
+        if (!e.hasItem())
+            return;
 
-        final ItemStack useItem = e.getItem().clone();
+        final ItemStack useItem = e.getItem();
         final EquipmentSlot equipmentSlot = useItem.getType().getEquipmentSlot();
-        if (equipmentSlot.ordinal() < 2) return;
+        if (equipmentSlot.ordinal() < 2)
+            return;
 
         final Player p = e.getPlayer();
-        if (p.getInventory().getItem(equipmentSlot) != null) return;
+        final ItemStack equipedItem = p.getInventory().getItem(equipmentSlot);
+        if (useItem.equals(equipedItem))
+            return;
+        if (equipedItem != null && equipedItem.getEnchantments().containsKey(Enchantment.BINDING_CURSE))
+            return;
 
-        Bukkit.getScheduler().runTask(ArmorPlugin.getPlugin(), () -> {
-            if (p.getInventory().getItem(equipmentSlot) != null) {
-                ArmorEvent armorEvent = callEquip(p, useItem, equipmentSlot, ArmorAction.HOTBAR);
-                // When cancelled unequip item in armor slot and put it back in the hand of the player.
-                if (armorEvent.isCancelled()) {
-                    p.getInventory().setItem(armorEvent.getArmorSlot(), null);
-                    p.getInventory().setItem(e.getHand(), armorEvent.getItem());
-                }
-            }
-        });
+        // can be null or an ItemStack{AIR x 0} if not wearing an armor
+        final boolean equipedIsEmpty = equipedItem == null || equipedItem.getType() == Material.AIR;
+        if (CAN_SWAP) {
+            // also unequipEvent if swapping armor pieces
+            if (!equipedIsEmpty)
+                callUnequip(p, equipedItem, equipmentSlot, ArmorAction.HOTBAR).updateCancellable(e);
 
+            callEquip(p, useItem, equipmentSlot, ArmorAction.HOTBAR).updateCancellable(e);
+        } else {
+            if (equipedIsEmpty)
+                callEquip(p, useItem, equipmentSlot, ArmorAction.HOTBAR).updateCancellable(e);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     private void onBlockDispenseArmor(BlockDispenseArmorEvent e) {
         if (e.getTargetEntity() instanceof Player) {
-            callEquip((Player)e.getTargetEntity(), e.getItem(), e.getItem().getType().getEquipmentSlot(), ArmorAction.DISPENSED).updateCancellable(e);
+            callEquip((Player) e.getTargetEntity(), e.getItem(), e.getItem().getType().getEquipmentSlot(),
+                    ArmorAction.DISPENSED).updateCancellable(e);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onPlayerItemBreak(PlayerItemBreakEvent e) {
         final ItemStack item = e.getBrokenItem();
-        if (item.getType().getEquipmentSlot().ordinal() < 2 || item.getAmount() > 1) return;
+        if (item.getType().getEquipmentSlot().ordinal() < 2 || item.getAmount() > 1)
+            return;
 
         callUnequip(e.getPlayer(), item, item.getType().getEquipmentSlot(), ArmorAction.BROKE);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onPlayerDeath(PlayerDeathEvent e) {
-        if (e.getKeepInventory()) return;
+        if (e.getKeepInventory())
+            return;
 
         final Player p = e.getEntity();
         final ItemStack[] armor = p.getInventory().getArmorContents();
         for (int i = 0; i < armor.length; i++) {
-            if (armor[i] == null) continue;
+            if (armor[i] == null)
+                continue;
             callUnequip(p, armor[i], EquipmentSlot.values()[i + 2], ArmorAction.DEATH);
         }
     }

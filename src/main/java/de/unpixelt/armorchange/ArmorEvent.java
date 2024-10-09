@@ -1,6 +1,5 @@
 package de.unpixelt.armorchange;
 
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -22,7 +21,7 @@ public abstract class ArmorEvent extends Event implements Cancellable {
     private final ArmorAction action;
 
     public ArmorEvent(@NotNull final Player who, @NotNull final ItemStack item,
-                      @NotNull final EquipmentSlot slot, @NotNull final ArmorAction action) {
+            @NotNull final EquipmentSlot slot, @NotNull final ArmorAction action) {
         this.who = who;
         this.item = item;
         this.slot = slot;
@@ -95,7 +94,7 @@ public abstract class ArmorEvent extends Event implements Cancellable {
 
     /**
      * Gets whether this event is cancelled. This is based off of the
-     * Result value returned by {@link #getResult()}.  Result.ALLOW and
+     * Result value returned by {@link #getResult()}. Result.ALLOW and
      * Result.DEFAULT will result in a returned value of false, but
      * Result.DENY will result in a returned value of true.
      * <p>
@@ -129,7 +128,8 @@ public abstract class ArmorEvent extends Event implements Cancellable {
      * @param toCancel The cancellable event to update.
      */
     protected void updateCancellable(@NotNull Cancellable toCancel) {
-        toCancel.setCancelled(isCancelled());
+        if (isCancelled())
+            toCancel.setCancelled(true);
     }
 
     public enum ArmorAction {

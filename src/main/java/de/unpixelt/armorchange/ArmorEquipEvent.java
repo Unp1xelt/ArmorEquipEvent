@@ -1,6 +1,5 @@
 package de.unpixelt.armorchange;
 
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.inventory.EquipmentSlot;
@@ -15,12 +14,12 @@ public class ArmorEquipEvent extends ArmorEvent {
     private static final HandlerList HANDLERS = new HandlerList();
 
     protected ArmorEquipEvent(@NotNull final Player who, @NotNull final ItemStack item,
-                              @NotNull final EquipmentSlot slot, @NotNull final ArmorAction action) {
+            @NotNull final EquipmentSlot slot, @NotNull final ArmorAction action) {
         super(who, item, slot, action);
     }
 
     public ArmorEquipEvent(@NotNull final Player who, @NotNull final ItemStack item,
-                           @NotNull final EquipmentSlot slot) {
+            @NotNull final EquipmentSlot slot) {
         this(who, item, slot, ArmorAction.CUSTOM);
     }
 
